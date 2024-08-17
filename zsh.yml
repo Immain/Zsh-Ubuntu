@@ -1,13 +1,13 @@
 - hosts: localhost
   tasks:
     - name: Install Zsh
-      homebrew:
+      package:
         name: zsh
         state: present
 
     - name: Install Oh My Zsh
       shell: |
-        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh --unattended)"
       args:
         creates: ~/.oh-my-zsh
 
@@ -17,7 +17,7 @@
       args: {}
 
     - name: Install fontconfig
-      homebrew:
+      apt:
         name: fontconfig
         state: present
       register: fontconfig_installer
@@ -27,18 +27,29 @@
         url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/UbuntuMono.zip
         dest: /tmp/UbuntuMono.zip
 
+    - name: Ensure font directory exists
+      file:
+        path: ~/.local/share/fonts
+        state: directory
+
+    - name: Ensure unzip is installed
+      apt:
+        name: unzip
+        state: present
+
     - name: Unzip Ubuntu Mono font
       unarchive:
         src: /tmp/UbuntuMono.zip
-        dest: ~/Library/Fonts
+        dest: ~/.local/share/fonts
         remote_src: yes
+        extra_opts: ['-o'] # Use unzip options to overwrite files
 
     - name: Update font cache
-      command: brew tap homebrew/cask-fonts && brew install --cask font-ubuntu-mono
+      command: fc-cache -f -v
 
     - name: Install Starship
       shell: |
-        curl -sS https://starship.rs/install.sh --yes | sh
+        curl -sS https://starship.rs/install.sh | sh -s -- -y
       args:
         creates: ~/.cargo/bin/starship
 
@@ -52,133 +63,68 @@
         dest: ~/.config/starship.toml
         content: |
           # Starship configuration
-          format = """
-          [╭─user───❯](bold blue) $username
-          [┣─system─❯](bold yellow) $hostname
-          [┣─project❯](bold red) $directory$rust$git_branch$git_status$package$golang$terraform$docker_context$python$docker_context$nodejs
-          [╰─cmd────❯](bold green) 
+          format = """\
+          [](bg:#030B16 fg:#7DF9AA)\
+          [](bg:#7DF9AA fg:#090c0c)\
+          [](fg:#7DF9AA bg:#1C3A5E)\
+          $time\
+          [](fg:#1C3A5E bg:#3B76F0)\
+          $directory\
+          [](fg:#3B76F0 bg:#FCF392)\
+          $git_branch\
+          $git_status\
+          $git_metrics\
+          [](fg:#FCF392 bg:#030B16)\
+          $character\
           """
-          
-          [username]
-          style_user = "green bold"
-          style_root = "red bold"
-          format = "[$user]($style) "
-          disabled = false
-          show_always = true
-
-          [hostname]
-          ssh_only = false
-          format = 'on [$hostname](bold yellow) '
-          trim_at = "."
-          disabled = false
-
-          [character]
-          success_symbol = "[➜](bold green)"
-          error_symbol = "[✗](bold red)"
 
           [directory]
-          read_only = " "
-          truncation_length = 10
-          truncate_to_repo = true
-          style = "bold italic blue"
-
-          [cmd_duration]
-          min_time = 4
-          show_milliseconds = false
-          disabled = false
-          style = "bold italic red"
-
-          [aws]
-          symbol = "  "
-
-          [conda]
-          symbol = " "
-
-          [dart]
-          symbol = " "
-
-          [docker_context]
-          symbol = " "
-          format = "via [$symbol$context]($style) "
-          style = "blue bold"
-          only_with_files = true
-          detect_files = ["docker-compose.yml", "docker-compose.yaml", "Dockerfile"]
-          detect_folders = []
-          disabled = false
-
-          [elixir]
-          symbol = " "
-
-          [elm]
-          symbol = " "
+          format = "[  $path ]($style)"
+          style = "fg:#E4E4E4 bg:#3B76F0"
 
           [git_branch]
-          symbol = " "
+          format = '[ $symbol$branch(:$remote_branch) ]($style)'
+          symbol = "  "
+          style = "fg:#1C3A5E bg:#FCF392"
 
-          [golang]
-          symbol = " "
+          [git_status]
+          format = '[$all_status]($style)'
+          style = "fg:#1C3A5E bg:#FCF392"
+
+          [git_metrics]
+          format = "([+$added]($added_style))[]($added_style)"
+          added_style = "fg:#1C3A5E bg:#FCF392"
+          deleted_style = "fg:bright-red bg:235"
+          disabled = false
 
           [hg_branch]
+          format = "[ $symbol$branch ]($style)"
           symbol = " "
 
-          [java]
-          symbol = " "
+          [cmd_duration]
+          format = "[  $duration ]($style)"
+          style = "fg:bright-white bg:18"
 
-          [julia]
-          symbol = " "
+          [character]
+          success_symbol = '[ ➜](bold green) '
+          error_symbol = '[ ✗](#E84D44) '
 
-          [memory_usage]
-          symbol = "󰍛 "
+          [time]
+          disabled = false
+          time_format = "%R" # Hour:Minute Format
+          style = "bg:#1d2230"
+          format = '[[  $time ](bg:#1C3A5E fg:#8DFBD2)]($style)'
 
-          [nim]
-          symbol = " "
+    - name: Export PATH for Starship
+      shell: |
+        export PATH="$HOME/.cargo/bin:$PATH"
 
-          [nix_shell]
-          symbol = " "
-
-          [package]
-          symbol = "󰏗 "
-
-          [perl]
-          symbol = " "
-
-          [php]
-          symbol = " "
-
-          [python]
-          symbol = " "
-          format = 'via [${symbol}python (${version} )(\($virtualenv\) )]($style)'
-          style = "bold yellow"
-          pyenv_prefix = "venv "
-          python_binary = ["./venv/bin/python", "python", "python3", "python2"]
-          detect_extensions = ["py"]
-          version_format = "v${raw}"
-
-          [ruby]
-          symbol = " "
-
-          [rust]
-          symbol = " "
-
-          [scala]
-          symbol = " "
-
-          [shlvl]
-          symbol = " "
-
-          [swift]
-          symbol = "ﯣ "
-
-          [nodejs]
-          format = "via [ Node.js $version](bold green) "
-          detect_files = ["package.json", ".node-version"]
-          detect_folders = ["node_modules"]
-
-    - name: Update .zshrc to source Starship
+    - name: Initialize Starship prompt for zsh
       lineinfile:
         path: ~/.zshrc
-        line: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          eval "$(starship init zsh)"
+        line: 'eval "$(starship init zsh)"'
         create: yes
 
+    - name: Trigger eval to activate starship
+      shell: |
+        zsh -c 'source ~/.zshrc && eval "$(starship init zsh)"'
